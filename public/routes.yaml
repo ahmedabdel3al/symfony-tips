@@ -1,9 +1,0 @@
-# routes.yaml
-route1:
-    path:       /blog/{id}
-    controller: \App\BlogController::index
-    methods:    GET
-route2:
-    path:       /foo/bar
-    controller: FooBarInvokableController
-    methods:    PUT

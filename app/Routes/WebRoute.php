@@ -13,12 +13,13 @@ class WebRoute
      * In addition, it is set as the URL generator's root namespace.
      *
      * @var string
-    */
+     */
     protected $namespace = 'App\Controller';
-    public function register(RouteCollection $routeCollection){
-        $routeCollection->add('blog_index' , new Route('blog' , [
-            '_controller'=> $this->namespace .'\HomeController'
+    public function register(RouteCollection $routeCollection)
+    {
+        $routeCollection->add('blog_index', new Route('blog/{blog}', [
+            '_controller' => $this->namespace . '\HomeController::index'
         ]));
-        return $routeCollection ;
+        return $routeCollection;
     }
 }

@@ -12,27 +12,11 @@
 |
 */
 
-require __DIR__.'/../vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
+
 use Symfony\Component\HttpFoundation\Request;
 use App\Application;
 
-/**
- * Create request from global
- */ 
-$request = Request::createFromGlobals();
 $app = new  Application();
-$response = $app->handle($request);
-//$response->send();
-
-
-
-
-
-
-
-
-
-
-
-
-
+$response = $app->handle(Request::createFromGlobals());
+$response->send();

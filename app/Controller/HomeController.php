@@ -7,13 +7,23 @@ use Symfony\Component\HttpFoundation\Response;
 
 class HomeController
 {
-    // public $request;
-    // public function __construct(Request $request)
-    // {
-    //     $this->request = $request;
-    // }
-    public function index($blog, Request $request)
+    protected $request ;
+
+    public function __construct(Request $request)
     {
-        return new Response('inside response');
+        $this->request = $request;
     }
+    public function __invoke()
+    {
+        dd('boly fci');
+    }
+    // public function index($blog, Request $request)
+    // {
+    //     dd($blog , $request);
+    //     return new Response('inside response');
+    // }
+    // public function  __invoke()
+    // {
+    //    dd('boly fci');   
+    // }
 }

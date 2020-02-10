@@ -2,21 +2,22 @@
 
 namespace App;
 
-use Symfony\Component\HttpKernel\HttpKernelInterface;
-use Symfony\Component\HttpFoundation\Request;
-use App\Traits\ApplicationTraits;
 use Exception;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Controller\ArgumentResolver;
-use Symfony\Component\HttpKernel\Controller\ControllerResolver;
-use Symfony\Component\Routing\Exception\ResourceNotFoundException;
-use Symfony\Component\Routing\Matcher\UrlMatcher;
 use Symfony\Component\Routing\RequestContext;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\RouteCollection;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Matcher\UrlMatcher;
+use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\HttpKernel\Controller\ControllerResolver;
+use App\Traits\ResovleMethodArguments;
+use App\Traits\ResolveController;
+use Closure;
+use ReflectionFunction;
 
 class Application implements HttpKernelInterface
 {
-
+    use ResovleMethodArguments , ResolveController;
 
     public  $dependancies = [];
 
@@ -30,56 +31,61 @@ class Application implements HttpKernelInterface
      */
     public function handle(Request $request, int $type = self::MASTER_REQUEST, bool $catch = true)
     {
-        $this->singleTon('router', function () {
+       
+        $this->registerSingletones($request);
+        $this->registerServiceProvider($this);
+        //dispatch controller with method 
+        return $this->resolveIncomingRequest($request);
+    }
+    /**
+     * Set Singleton in Application 
+     *
+     * @param Request $request
+     * @return void
+     */
+    protected function registerSingletones(Request $request){
+        // register singleton of routeCollection 
+        $this->singleTon(RouteCollection::class, function () {
             return new RouteCollection;
         });
-        $this->registerServiceProvider($this);
-        //resolve controller 
-        return $this->resolveIncomingRequest($request, $this->get('router'));
-    }
-    public function resolveIncomingRequest(Request $request, RouteCollection $router)
-    {
+        //register singleton of Request 
+        $this->singleTon(Request::class , function() use ($request){
+            return $request;
+        });
 
+    }
+    /**
+     * Undocumented function
+     *
+     * @param Request $request
+     * @param RouteCollection $router
+     * @return void
+     */
+    public function resolveIncomingRequest($request)
+    {
         $context = new RequestContext();
         $context->fromRequest($request);
-        $matcher = new UrlMatcher($router, $context);
-
-        $controllerResolver = new ControllerResolver();
-        $argumentResolver = new ArgumentResolver();
-
-        // try {
+        $matcher = new UrlMatcher($this->get(RouteCollection::class), $context);
 
         $request->attributes->add($matcher->match($request->getPathInfo()));
-        $controller = $controllerResolver->getController($request);
-        //$arguments = $argumentResolver->getArguments($request, $controller);
-        $arguments = $this->resovleMethodArguments($request, $controller);
-        // $response = call_user_func_array($controller, $arguments);
-        // } catch (ResourceNotFoundException $exception) {
-        //     $response = new Response('Not Found', 404);
-        // } catch (Exception $exception) {
-        //     $response = new Response('An error occurred', 500);
-        // }
-        // return $response;
-    }
-    public function resovleMethodArguments($request, $controller)
-    {
-        $resolvedController =  $this->getReflector($controller[0]);
-        if (!$resolvedController->hasMethod($controller[1])) {
-            return;
-        }
-        $method = $resolvedController->getMethod($controller[1]);
-        $resolvedParameters = [];
-        foreach ($method->getParameters() as $dependacy) {
-            if (!$dependacy->getClass() && $dependacy->getName()) {
-                $resolvedParameters[] = $request->get($dependacy->getName());
-                $request->attributes->remove($dependacy->getName());
-                continue;
-            }
-            if ($dependacy->getClass()) {
 
-                $resolvedParameters[] = $this->get($dependacy->getClass()->getName());
-            }
+        [$controller , $method] = $this->resolveController($request);
+    
+        if($controller instanceof Closure){
+            $arguments = $this->resovleMethodArguments($request, [$controller , $method]);
+            return $controller(...$arguments);
+            
         }
+
+        if(is_null($method)){
+            return $this->get($controller)();
+        }
+        $arguments = $this->resovleMethodArguments($request, [$controller , $method]);
+
+        
+        return $this->get($controller)->{$method}(...$arguments);
+
+    
     }
     public function registerServiceProvider($application)
     {
@@ -87,10 +93,6 @@ class Application implements HttpKernelInterface
         foreach ($providers as $provider) {
             (new $provider($this))->map();
         }
-    }
-    public function dependancies()
-    {
-        return $this->dependancies;
     }
     /**
      * set item inside container
@@ -138,7 +140,6 @@ class Application implements HttpKernelInterface
      */
     public function get($name)
     {
-        dump($name);
         if ($this->has($name)) {
             return $this->dependancies[$name]($this);
         }
@@ -146,6 +147,7 @@ class Application implements HttpKernelInterface
     }
     public function autowire($name)
     {
+
         if (!class_exists($name)) {
             throw new Exception;
         }
